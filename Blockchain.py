@@ -3,8 +3,10 @@ import hashlib
 from time import time
 from uuid import uuid4
 from flask import Flask, jsonify, request
+from flask_cors import CORS
 import requests
 from urllib.parse import urlparse
+from argparse import ArgumentParser
 
 """
  A blockchain is an immutable, sequential chain of records called Blocks
@@ -21,15 +23,16 @@ class Blockchain:
     """
 
     def __init__(self):
-
         self.chain = []
         self.current_transaction = []
+        self.nodes = set()  # Initialize empty set of nodes
         # starting block
         self.new_block(proof=100, prev_hash=1)
-        self.nodes = set()
 
     # create and add a new block to the chain
     def new_block(self, proof, prev_hash):
+        # Store current nodes before creating new block
+        current_nodes = self.nodes
 
         block = {
             "index": len(self.chain) + 1,
@@ -40,6 +43,10 @@ class Blockchain:
         }
         self.current_transaction = []
         self.chain.append(block)
+
+        # Restore nodes after creating new block
+        self.nodes = current_nodes
+
         return block
 
     # create and add a new transaction to the list of transactions
@@ -89,34 +96,55 @@ class Blockchain:
     # check the chain to make sure it is valid
     # pretty much just check the last hash is the same as the current block prev hash
     def valid_chain(self, chain):
-
+        """
+        Determine if a given blockchain is valid
+        """
         last_block = chain[0]
         current_index = 1
-        while current_index < len(self.chain):
+
+        while current_index < len(chain):  # Changed from len(self.chain) to len(chain)
             block = chain[current_index]
-            print(f"{last_block}")
-            print(f"{block}")
-            print("-----------------")
-            if block["previous_hash"] != self.hash(last_block):
+
+            # Check that the hash of the block is correct
+            if block["prev_hash"] != self.hash(
+                last_block
+            ):  # Changed from "previous_hash" to "prev_hash"
                 return False
+
             last_block = block
             current_index += 1
+
         return True
 
     # consensus algo to keep all the chains the same
     # check the nodes to see which one has the longest and set that as the chain
     def resolve_conflicts(self):
+        """
+        Consensus algorithm: resolve conflicts by replacing our chain with
+        the longest valid chain in the network
+        """
         neighbors = self.nodes
         new_chain = None
-        max_length = len(self.nodes)
+        # We're only looking for chains longer than ours
+        max_length = len(self.chain)  # Changed from len(self.nodes) to len(self.chain)
+
+        # Grab and verify the chains from all the nodes in our network
         for node in neighbors:
-            response = requests.get(f"http://{node}/chain")
-            if response.status_code == 200:
-                length = response.json()["length"]
-                chain = response.json()["chain"]
-            if length > max_length and self.valid_chain(chain):
-                max_length = length
-                new_chain = chain
+            try:
+                response = requests.get(f"http://{node}/chain")
+                if response.status_code == 200:
+                    length = response.json()["length"]
+                    chain = response.json()["chain"]
+
+                    # Check if the length is longer and the chain is valid
+                    if length > max_length and self.valid_chain(chain):
+                        max_length = length
+                        new_chain = chain
+            except requests.RequestException as e:
+                print(f"Error connecting to node {node}: {str(e)}")
+                continue
+
+        # Replace our chain if we discovered a new, valid chain longer than ours
         if new_chain:
             self.chain = new_chain
             return True
@@ -125,6 +153,7 @@ class Blockchain:
 
 
 app = Flask(__name__)
+CORS(app)  # Enable CORS for all routes
 
 node = str(uuid4()).replace("-", "")
 
@@ -163,7 +192,7 @@ def new_transation():
         values["sender"], values["recipient"], values["amount"]
     )
     response = {"message": f"Transaction is added to Block {index}"}
-    return json.response, 201
+    return jsonify(response), 201
 
 
 @app.route("/chain", methods=["GET"])
@@ -193,15 +222,38 @@ def register_nodes():
 
 @app.route("/nodes/resolve", methods=["GET"])
 def consensus():
+    print("Starting consensus resolution...")  # Debug log
     replaced = blockchain.resolve_conflicts()
 
     if replaced:
         response = {"message": "Our chain was replaced", "new_chain": blockchain.chain}
     else:
-        response = {"message": "Our chain is the main chain", "chain": blockchain.chain}
+        response = {"message": "Our chain is authoritative", "chain": blockchain.chain}
 
+    print(f"Consensus resolution complete: {response['message']}")  # Debug log
+    return jsonify(response), 200
+
+
+@app.route("/node-id", methods=["GET"])
+def get_node_id():
+    response = {"node_id": node}
+    return jsonify(response), 200
+
+
+@app.route("/nodes", methods=["GET"])
+def get_nodes():
+    response = {"total_nodes": list(blockchain.nodes), "current_node": request.host_url}
     return jsonify(response), 200
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    parser = ArgumentParser()
+    parser.add_argument(
+        "-p", "--port", default=5000, type=int, help="port to listen on"
+    )
+    args = parser.parse_args()
+
+    # Print which port we're using
+    print(f"Starting blockchain node on port {args.port}")
+
+    app.run(host="0.0.0.0", port=args.port)
