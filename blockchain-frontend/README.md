@@ -1,12 +1,53 @@
-# React + Vite
+# Blockchain Explorer Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A modern web application for exploring and interacting with a blockchain network. Built with React, Vite, and Chakra UI.
 
-Currently, two official plugins are available:
+## Installation
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+1. Clone the repository:
 
-## Expanding the ESLint configuration
+```bash
+git clone <your-repository-url>
+cd blockchain-frontend
+```
 
-If you are developing a production application, we recommend using TypeScript and enable type-aware lint rules. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+2. Install dependencies:
+
+```bash
+npm install
+# or
+yarn install
+```
+
+3. Start the development server:
+
+```bash
+npm run dev
+# or
+yarn dev
+```
+
+The application will be available at `http://localhost:5173` by default.
+
+## Available Scripts
+
+- `npm run dev` - Start development server
+- `npm run build` - Build for production
+- `npm run preview` - Preview production build
+- `npm run lint` - Run ESLint
+
+## Dependencies
+
+- React 18
+- Vite
+- Chakra UI
+- React Router DOM
+- Axios
+- React Icons
+- Framer Motion
+
+## API Integration
+
+The application communicates with a blockchain backend API. By default, it connects to:
+
+- Primary node: `http://localhost:5000`
